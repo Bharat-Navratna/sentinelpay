@@ -10,9 +10,11 @@ The MVP begins as one Next.js application so routes, business rules and presenta
 - `src/components` is reserved for reusable UI.
 - `src/lib` is reserved for shared, domain-independent utilities.
 - `src/modules` is reserved for domain-owned types, rules and services.
+- `src/db` contains the PostgreSQL schema, isolated Neon HTTP client, seed and typed dashboard query.
+- `drizzle` contains generated, versioned SQL migrations.
 - `docs` records product scope, architecture, delivery issues and learning notes.
 
-At present, only the static foundation landing page is implemented.
+The repository foundation and a read-only, synthetic customer dashboard are implemented. Payment mutations and the later fraud journey remain unimplemented.
 
 ## Planned domains
 
@@ -26,7 +28,17 @@ At present, only the static foundation landing page is implemented.
 - **Ledger:** balanced entries stored in integer minor units, with reversals for corrections.
 - **Audit:** append-only records of important actions and decisions.
 
-## Planned request and data flow
+## Current dashboard request and data flow
+
+1. A browser requests `/customer`.
+2. Next.js dynamically renders the Server Component without exposing database code to the browser.
+3. The page calls the dashboard query in `src/db/queries`.
+4. The query asks the lazy client for a Drizzle database instance; only then is `DATABASE_URL` checked and the Neon HTTP driver created.
+5. Drizzle translates the typed selections, joins and filters into PostgreSQL SQL sent to Neon.
+6. The query shapes rows into a dashboard view model and the server renders HTML.
+7. Connection or query failures are handled by a generic route error boundary that reveals no database details.
+
+## Planned domain request and data flow
 
 1. A browser request reaches a Next.js route in `src/app`.
 2. The route validates untrusted input on the server.
@@ -37,4 +49,12 @@ At present, only the static foundation landing page is implemented.
 
 ## Intentionally not implemented
 
-There are currently no domain services, route handlers, persistence adapters, database, authentication, external APIs, AI integration, payment processing, fraud decisions, evidence processing, recovery actions, reimbursement decisions or ledger postings. These are architectural intentions, not claims of working capability.
+There are currently no authentication, payment mutations, state-transition services, risk decisions, evidence processing, recovery actions, reimbursement decisions, ledger postings or AI integration. Neon persistence currently supports only the seeded, read-only dashboard demonstration.
+
+## Database indexes
+
+- `accounts_customer_id_idx` supports listing a customer’s accounts.
+- `beneficiaries_customer_id_idx` supports listing a customer’s saved beneficiaries.
+- `payments_account_id_created_at_idx` supports an account’s payment history in creation order.
+- `payment_events_payment_id_occurred_at_idx` supports an ordered event timeline for one payment.
+- `payments_idempotency_key_idx` enforces uniqueness and supports future duplicate-request lookup.
