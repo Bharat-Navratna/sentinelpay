@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SentinelPay
 
-## Getting Started
+SentinelPay is a portfolio application exploring an AI-assisted approach to authorised push payment (APP) fraud prevention, fund recovery and reimbursement.
 
-First, run the development server:
+> **Simulation only:** SentinelPay does not move real money, connect to live bank accounts, make real fraud decisions, process genuine customer evidence, or replace investigators or regulated payment providers. Demonstrations will use synthetic data.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
+## Planned MVP journey
+
+The seven-day MVP is intended to demonstrate one traceable journey:
+
+1. A customer starts a suspicious payment.
+2. A risk signal triggers an intervention.
+3. The customer submits a scam report.
+4. An investigator records a simulated fund-recovery attempt.
+5. A human reviews a reimbursement assessment supported, but not decided, by AI.
+6. The simulated outcome is posted to a balanced ledger with an audit trail.
+
+## Current status
+
+Only the repository foundation is complete: the Next.js scaffold, modular-monolith directories, project documentation, landing page, validation scripts and CI workflow. The planned financial and fraud workflows are not implemented.
+
+## Installed technology
+
+- Next.js 16.2.12 with the App Router
+- React 19.2.4
+- TypeScript 5 in strict mode
+- Tailwind CSS 4 through PostCSS
+- ESLint 9 with the Next.js configuration
+- pnpm and a committed lockfile
+
+No database, authentication, AI service, external API or component library has been added.
+
+## Local setup
+
+Prerequisites: Node.js 24 and pnpm 11.18.0.
+
+```powershell
+pnpm install --frozen-lockfile
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000` in a browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Validation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```powershell
+pnpm lint
+pnpm typecheck
+pnpm build
+```
 
-## Learn More
+## Repository structure
 
-To learn more about Next.js, take a look at the following resources:
+```text
+src/app/          Next.js routes, root layout and global styles
+src/components/   Shared presentation components (currently empty)
+src/lib/          Shared application utilities (currently empty)
+src/modules/      Future domain modules within the monolith (currently empty)
+docs/product/     Product scope and constraints
+docs/architecture/ Architecture decisions and system flow
+docs/devlog/      Day-by-day learning notes
+docs/issues/      Task definitions and acceptance criteria
+.github/workflows/ Continuous integration configuration
+public/           Static local assets from the scaffold
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project documentation
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- [MVP scope](docs/product/mvp-scope.md)
+- [System overview](docs/architecture/system-overview.md)
+- [Project foundation issue](docs/issues/001-project-foundation.md)
+- [Day 00 development log](docs/devlog/day-00.md)
 
-## Deploy on Vercel
+## Limitations
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This is an early educational foundation. It has no persistence, user accounts, case management, payment processing, risk engine, evidence handling, recovery workflow, reimbursement workflow, ledger or AI integration. It must not be used with real customer, banking or evidence data.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## AI-assisted development disclosure
+
+AI assistance is used during development for planning, implementation review and documentation. The repository owner remains responsible for understanding, testing and approving the code. Any future product AI output will be presented with uncertainty and will not make final fraud, dishonesty or reimbursement decisions.
