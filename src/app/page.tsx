@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const journeyStages = [
   "Suspicious payment",
   "Risk intervention",
@@ -44,6 +46,12 @@ export default function Home() {
                 oversight.
               </p>
             </div>
+            <Link
+              className="mt-8 inline-flex rounded-lg bg-cyan-300 px-5 py-3 font-semibold text-slate-950 transition-colors hover:bg-cyan-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+              href="/customer"
+            >
+              View synthetic customer dashboard
+            </Link>
           </div>
 
           <aside className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-2xl shadow-black/20 sm:p-8">
