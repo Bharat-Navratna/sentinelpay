@@ -8,6 +8,13 @@
       "when": 1785603907227,
       "tag": "0000_black_banshee",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785788752680,
+      "tag": "0001_minor_molten_man",
+      "breakpoints": true
     }
   ]
 }

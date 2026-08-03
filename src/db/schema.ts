@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   index,
   integer,
@@ -27,6 +28,22 @@ export const paymentStatus = pgEnum("payment_status", [
   "CANCELLED",
   "REJECTED",
 ]);
+
+export const paymentRiskDecision = pgEnum("payment_risk_decision", [
+  "ALLOW",
+  "INTERVENE",
+]);
+
+export const paymentRiskReason = pgEnum("payment_risk_reason", [
+  "NEW_PAYEE",
+  "AMOUNT_OUTLIER",
+  "INVESTMENT_SCAM_LANGUAGE",
+]);
+
+export const paymentInterventionStatus = pgEnum(
+  "payment_intervention_status",
+  ["PENDING", "CANCELLED", "CONTINUED"],
+);
 
 export const customers = pgTable("customers", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -141,6 +158,77 @@ export const paymentEvents = pgTable(
   ],
 );
 
+export const paymentRiskAssessments = pgTable(
+  "payment_risk_assessments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .references(() => payments.id),
+    decision: paymentRiskDecision("decision").notNull(),
+    score: integer("score").notNull(),
+    reasonCodes: paymentRiskReason("reason_codes").array().notNull(),
+    facts: jsonb("facts")
+      .$type<{
+        previousSettledPaymentCount: number;
+        previousSettledPaymentCountToBeneficiary: number;
+        medianSettledAmountMinor: number | null;
+        amountOutlierThresholdMinor: number;
+        matchedInvestmentTerms: string[];
+      }>()
+      .notNull(),
+    ruleVersion: text("rule_version").notNull(),
+    evaluatedAt: timestamp("evaluated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("payment_risk_assessments_payment_id_idx").on(table.paymentId),
+    check(
+      "payment_risk_assessments_score_range_check",
+      sql`${table.score} between 0 and 100`,
+    ),
+    check(
+      "payment_risk_assessments_rule_version_not_blank_check",
+      sql`char_length(btrim(${table.ruleVersion})) > 0`,
+    ),
+    check(
+      "payment_risk_assessments_facts_object_check",
+      sql`jsonb_typeof(${table.facts}) = 'object'`,
+    ),
+    check(
+      "payment_risk_assessments_decision_score_check",
+      sql`(${table.decision} = 'ALLOW' and ${table.score} < 50) or (${table.decision} = 'INTERVENE' and ${table.score} >= 50)`,
+    ),
+  ],
+);
+
+export const paymentInterventions = pgTable(
+  "payment_interventions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .references(() => payments.id),
+    status: paymentInterventionStatus("status").notNull(),
+    copyVersion: text("copy_version").notNull(),
+    acknowledgementConfirmed: boolean("acknowledgement_confirmed")
+      .default(false)
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("payment_interventions_payment_id_idx").on(table.paymentId),
+    check(
+      "payment_interventions_copy_version_not_blank_check",
+      sql`char_length(btrim(${table.copyVersion})) > 0`,
+    ),
+    check(
+      "payment_interventions_lifecycle_check",
+      sql`(${table.status} = 'PENDING' and ${table.resolvedAt} is null and ${table.acknowledgementConfirmed} = false) or (${table.status} = 'CANCELLED' and ${table.resolvedAt} is not null and ${table.acknowledgementConfirmed} = false) or (${table.status} = 'CONTINUED' and ${table.resolvedAt} is not null and ${table.acknowledgementConfirmed} = true)`,
+    ),
+  ],
+);
+
 export const customersRelations = relations(customers, ({ many }) => ({
   accounts: many(accounts),
   beneficiaries: many(beneficiaries),
@@ -175,6 +263,8 @@ export const paymentsRelations = relations(payments, ({ one, many }) => ({
     references: [beneficiaries.id],
   }),
   events: many(paymentEvents),
+  riskAssessment: one(paymentRiskAssessments),
+  intervention: one(paymentInterventions),
 }));
 
 export const paymentEventsRelations = relations(paymentEvents, ({ one }) => ({
@@ -183,3 +273,23 @@ export const paymentEventsRelations = relations(paymentEvents, ({ one }) => ({
     references: [payments.id],
   }),
 }));
+
+export const paymentRiskAssessmentsRelations = relations(
+  paymentRiskAssessments,
+  ({ one }) => ({
+    payment: one(payments, {
+      fields: [paymentRiskAssessments.paymentId],
+      references: [payments.id],
+    }),
+  }),
+);
+
+export const paymentInterventionsRelations = relations(
+  paymentInterventions,
+  ({ one }) => ({
+    payment: one(payments, {
+      fields: [paymentInterventions.paymentId],
+      references: [payments.id],
+    }),
+  }),
+);
