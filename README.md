@@ -4,9 +4,9 @@ SentinelPay is a portfolio application exploring an AI-assisted approach to auth
 
 > **Simulation only:** SentinelPay does not move real money, connect to live bank accounts, make real fraud decisions, process genuine customer evidence, or replace investigators or regulated payment providers. All stored demonstration records are synthetic.
 
-## Planned MVP journey
+## MVP journey
 
-The intended journey covers a suspicious payment, risk intervention, scam report, simulated fund recovery, human-owned reimbursement assessment and balanced ledger posting. Those workflows are planned and are not implemented by the current database foundation.
+Payment creation and deterministic customer intervention are implemented as a simulation. Scam reporting, fund recovery, human-owned reimbursement assessment and balanced ledger posting remain planned.
 
 ## Current status
 
@@ -16,9 +16,14 @@ Implemented:
 - PostgreSQL schema and generated migration workflow using Drizzle.
 - Lazy server-side Neon HTTP database connection.
 - Idempotent synthetic seed data.
-- Read-only synthetic customer dashboard at `/customer`.
+- Synthetic customer dashboard at `/customer`.
+- Idempotent simulated GBP payment creation using integer pence.
+- Explainable `deterministic-v1` risk assessment.
+- Customer cancellation or explicitly acknowledged continuation.
+- Customer-safe payment details and ordered event timelines.
+- Atomic Neon HTTP batch persistence and conditional intervention resolution.
 
-Not implemented: authentication, payment creation or execution, state transitions, fraud detection, evidence handling, recovery, reimbursement decisions, ledger posting and AI integration.
+Not implemented: authentication, real payment execution, AI or machine learning, scam reporting, evidence handling, recovery, reimbursement decisions and ledger posting.
 
 ## Installed technology
 
@@ -64,6 +69,8 @@ pnpm build        Create a production build
 pnpm start        Serve a completed production build
 pnpm lint         Run ESLint
 pnpm typecheck    Check strict TypeScript without emitting files
+pnpm test         Run Vitest in watch mode
+pnpm test:run     Run the complete test suite once
 pnpm db:generate  Generate SQL migrations from schema changes
 pnpm db:migrate   Apply unapplied migrations
 pnpm db:seed      Insert the stable synthetic demonstration records safely
@@ -91,12 +98,14 @@ docs/              Product, architecture, issue and development notes
 - [System overview](docs/architecture/system-overview.md)
 - [Issue 001: project foundation](docs/issues/001-project-foundation.md)
 - [Issue 002: database foundation](docs/issues/002-database-foundation.md)
+- [Issue 003: payment risk flow](docs/issues/003-payment-risk-flow.md)
 - [Day 00 development log](docs/devlog/day-00.md)
 - [Day 01 development log](docs/devlog/day-01.md)
+- [Day 02 payment-risk development log](docs/devlog/day-02-payment-risk-flow.md)
 
 ## Security and limitations
 
-`DATABASE_URL` is server-only and checked only when a database operation runs, allowing CI to compile without the secret. The dashboard has no authentication and therefore displays only fixed synthetic demonstration data. It is read-only and does not calculate a current balance.
+`DATABASE_URL` is server-only and checked only when a database operation runs, allowing tests and CI builds to run without the secret. There is no authentication, so every customer route is restricted by convention to one fixed synthetic customer and is not production-safe. The displayed opening balance is seeded context, not a calculated available balance or ledger balance.
 
 ## AI-assisted development disclosure
 

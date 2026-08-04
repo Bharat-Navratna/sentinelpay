@@ -6,8 +6,11 @@ import {
   beneficiaries,
   customers,
   paymentEvents,
+  paymentInterventions,
   payments,
 } from "@/db/schema";
+import type { PaymentInterventionStatus } from "@/modules/payments/application/payment-types";
+import type { PaymentStatus } from "@/modules/payments/domain/payment-state-machine";
 
 const DEMO_CUSTOMER_EMAIL = "demo.customer@sentinelpay.local";
 
@@ -33,7 +36,8 @@ export type CustomerDashboard = {
     amountMinor: number;
     currencyCode: string;
     reference: string;
-    status: string;
+    status: PaymentStatus;
+    interventionStatus: PaymentInterventionStatus | null;
     createdAt: Date;
     events: Array<{
       id: string;
@@ -94,10 +98,15 @@ export async function getDemoCustomerDashboard(): Promise<CustomerDashboard | nu
       currencyCode: payments.currencyCode,
       reference: payments.reference,
       status: payments.status,
+      interventionStatus: paymentInterventions.status,
       createdAt: payments.createdAt,
     })
     .from(payments)
     .innerJoin(beneficiaries, eq(payments.beneficiaryId, beneficiaries.id))
+    .leftJoin(
+      paymentInterventions,
+      eq(paymentInterventions.paymentId, payments.id),
+    )
     .where(eq(payments.accountId, account.id))
     .orderBy(desc(payments.createdAt));
 
@@ -118,7 +127,7 @@ export async function getDemoCustomerDashboard(): Promise<CustomerDashboard | nu
             paymentRows.map((payment) => payment.id),
           ),
         )
-        .orderBy(asc(paymentEvents.occurredAt))
+        .orderBy(asc(paymentEvents.occurredAt), asc(paymentEvents.id))
     : [];
 
   return {
