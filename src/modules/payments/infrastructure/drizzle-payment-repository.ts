@@ -237,24 +237,24 @@ export class DrizzlePaymentRepository implements PaymentRepository {
           for update
         ), updated_intervention as (
           update ${paymentInterventions}
-          set ${paymentInterventions.status} = 'CANCELLED',
-              ${paymentInterventions.acknowledgementConfirmed} = false,
-              ${paymentInterventions.resolvedAt} = ${command.resolvedAt}
+          set "status" = 'CANCELLED',
+              "acknowledgement_confirmed" = false,
+              "resolved_at" = ${command.resolvedAt}
           where ${paymentInterventions.paymentId} in (select id from eligible_payment)
             and ${paymentInterventions.status} = 'PENDING'
           returning ${paymentInterventions.paymentId}
         ), transitioned_payment as (
           update ${payments}
-          set ${payments.status} = 'CANCELLED',
-              ${payments.updatedAt} = ${command.updatedAt}
+          set "status" = 'CANCELLED',
+              "updated_at" = ${command.updatedAt}
           where ${payments.id} in (select payment_id from updated_intervention)
             and ${payments.status} = 'CUSTOMER_INTERVENTION'
           returning ${payments.id}
         )
         insert into ${paymentEvents} (
-          ${paymentEvents.id}, ${paymentEvents.paymentId}, ${paymentEvents.eventType},
-          ${paymentEvents.fromStatus}, ${paymentEvents.toStatus},
-          ${paymentEvents.metadata}, ${paymentEvents.occurredAt}
+          "id", "payment_id", "event_type",
+          "from_status", "to_status",
+          "metadata", "occurred_at"
         )
         select ${firstEvent.id}, id, ${firstEvent.eventType},
                'CUSTOMER_INTERVENTION', 'CANCELLED',
@@ -283,24 +283,24 @@ export class DrizzlePaymentRepository implements PaymentRepository {
           for update
         ), updated_intervention as (
           update ${paymentInterventions}
-          set ${paymentInterventions.status} = 'CONTINUED',
-              ${paymentInterventions.acknowledgementConfirmed} = true,
-              ${paymentInterventions.resolvedAt} = ${command.resolvedAt}
+          set "status" = 'CONTINUED',
+              "acknowledgement_confirmed" = true,
+              "resolved_at" = ${command.resolvedAt}
           where ${paymentInterventions.paymentId} in (select id from eligible_payment)
             and ${paymentInterventions.status} = 'PENDING'
           returning ${paymentInterventions.paymentId}
         ), transitioned_payment as (
           update ${payments}
-          set ${payments.status} = 'AUTHORISED',
-              ${payments.updatedAt} = ${firstEvent.occurredAt}
+          set "status" = 'AUTHORISED',
+              "updated_at" = ${firstEvent.occurredAt}
           where ${payments.id} in (select payment_id from updated_intervention)
             and ${payments.status} = 'CUSTOMER_INTERVENTION'
           returning ${payments.id}
         )
         insert into ${paymentEvents} (
-          ${paymentEvents.id}, ${paymentEvents.paymentId}, ${paymentEvents.eventType},
-          ${paymentEvents.fromStatus}, ${paymentEvents.toStatus},
-          ${paymentEvents.metadata}, ${paymentEvents.occurredAt}
+          "id", "payment_id", "event_type",
+          "from_status", "to_status",
+          "metadata", "occurred_at"
         )
         select ${firstEvent.id}, id, ${firstEvent.eventType},
                'CUSTOMER_INTERVENTION', 'AUTHORISED',
@@ -310,8 +310,8 @@ export class DrizzlePaymentRepository implements PaymentRepository {
       const settlement = this.db.execute(sql`
         with transitioned_payment as (
           update ${payments}
-          set ${payments.status} = 'SETTLED',
-              ${payments.updatedAt} = ${command.updatedAt}
+          set "status" = 'SETTLED',
+              "updated_at" = ${command.updatedAt}
           where ${payments.id} = ${command.paymentId}
             and ${payments.status} = 'AUTHORISED'
             and exists (
@@ -322,9 +322,9 @@ export class DrizzlePaymentRepository implements PaymentRepository {
           returning ${payments.id}
         )
         insert into ${paymentEvents} (
-          ${paymentEvents.id}, ${paymentEvents.paymentId}, ${paymentEvents.eventType},
-          ${paymentEvents.fromStatus}, ${paymentEvents.toStatus},
-          ${paymentEvents.metadata}, ${paymentEvents.occurredAt}
+          "id", "payment_id", "event_type",
+          "from_status", "to_status",
+          "metadata", "occurred_at"
         )
         select ${settledEvent.id}, id, ${settledEvent.eventType},
                'AUTHORISED', 'SETTLED',

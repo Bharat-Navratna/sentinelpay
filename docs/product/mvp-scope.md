@@ -39,3 +39,15 @@ A synthetic customer initiates a suspicious payment. A simulated risk signal pro
 ## Synthetic-data and simulation limitations
 
 All personas, payments, evidence, risk signals, recovery actions, decisions and ledger entries must be synthetic. A displayed freeze, return, recovery or reimbursement represents only a simulated state change. Results cannot establish how a bank, investigator, payment provider or regulator would decide a real case, and AI output must never be treated as a final decision.
+
+## Current implementation boundary
+
+Implemented now:
+
+- creation of synthetic GBP payments using integer pence;
+- deterministic demonstration risk assessment;
+- customer warning, cancellation and acknowledged continuation;
+- simulated settlement states and ordered payment events;
+- customer-safe payment detail and dashboard views.
+
+These operations change demonstration records only. They do not move money or establish that fraud occurred. Authentication and every later case, evidence, recovery, reimbursement, ledger and AI stage remain planned or intentionally excluded from the current milestone.

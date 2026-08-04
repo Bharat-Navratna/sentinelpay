@@ -14,7 +14,7 @@ The MVP begins as one Next.js application so routes, business rules and presenta
 - `drizzle` contains generated, versioned SQL migrations.
 - `docs` records product scope, architecture, delivery issues and learning notes.
 
-The repository foundation and a read-only, synthetic customer dashboard are implemented. Payment mutations and the later fraud journey remain unimplemented.
+The repository foundation, synthetic customer dashboard, simulated payment creation, deterministic risk assessment and customer intervention resolution are implemented. Later scam-reporting, recovery, reimbursement, ledger and AI workflows remain unimplemented.
 
 ## Planned domains
 
@@ -38,18 +38,22 @@ The repository foundation and a read-only, synthetic customer dashboard are impl
 6. The query shapes rows into a dashboard view model and the server renders HTML.
 7. Connection or query failures are handled by a generic route error boundary that reveals no database details.
 
-## Planned domain request and data flow
+## Implemented payment request and data flow
 
-1. A browser request reaches a Next.js route in `src/app`.
-2. The route validates untrusted input on the server.
-3. It calls the appropriate domain service in `src/modules`.
-4. The domain enforces permissions, state transitions, idempotency and financial invariants.
-5. A future persistence adapter records domain state, append-only audit events and balanced ledger entries atomically where required.
-6. The route returns a safe view model for rendering. AI-derived fields will include model version, prompt version, structured output and uncertainty, and remain subject to human review.
+1. A dynamic Server Component loads the fixed synthetic account and customer-safe data.
+2. A Client Component handles only form interaction and pending/error presentation.
+3. A Server Action parses untrusted `FormData` with Zod.
+4. The action calls the application service through the Drizzle repository adapter.
+5. Existing pure domain functions enforce integer money, deterministic risk and permitted state transitions.
+6. Initial workflow records are written through one Drizzle batch backed by Neon’s non-interactive transaction array.
+7. Intervention resolution uses expected-state CTE updates so events depend on successful transitions.
+8. A customer-safe mapper removes scores, internal facts, reasons and event metadata before rendering.
+
+Application tests use an in-memory repository and require no database connection. There are currently no automated PostgreSQL integration tests.
 
 ## Intentionally not implemented
 
-There are currently no authentication, payment mutations, state-transition services, risk decisions, evidence processing, recovery actions, reimbursement decisions, ledger postings or AI integration. Neon persistence currently supports only the seeded, read-only dashboard demonstration.
+There is currently no authentication, real payment execution, evidence processing, recovery action, reimbursement decision, ledger posting or product AI integration. The customer routes operate only on fixed synthetic data and are not suitable for production use.
 
 ## Database indexes
 
@@ -58,3 +62,5 @@ There are currently no authentication, payment mutations, state-transition servi
 - `payments_account_id_created_at_idx` supports an account’s payment history in creation order.
 - `payment_events_payment_id_occurred_at_idx` supports an ordered event timeline for one payment.
 - `payments_idempotency_key_idx` enforces uniqueness and supports future duplicate-request lookup.
+- `payment_risk_assessments_payment_id_idx` enforces one assessment per payment and supports lookup.
+- `payment_interventions_payment_id_idx` enforces one intervention per payment and supports lookup.
