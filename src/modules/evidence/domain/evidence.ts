@@ -35,3 +35,10 @@ export const MAX_PDF_PAGES = 20;
 export const MAX_PASTED_TEXT_CHARACTERS = 10_000;
 export const MAX_CALL_NOTE_CHARACTERS = 10_000;
 export const MAX_NORMALIZED_DISPLAY_FILENAME_CHARACTERS = 255;
+
+export function isEvidenceKindStatusValid(
+  kind: EvidenceKind,
+  status: EvidenceStatus,
+): boolean {
+  return kind === "FILE" || status === "READY" || status === "REMOVED";
+}

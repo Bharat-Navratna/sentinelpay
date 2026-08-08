@@ -13,12 +13,27 @@ import {
   evidenceKinds,
   evidenceStatuses,
   inlineEvidenceKinds,
+  isEvidenceKindStatusValid,
 } from "./evidence";
 
 describe("frozen evidence domain catalogs and limits", () => {
   it("defines only the approved evidence kinds", () => {
     expect(evidenceKinds).toEqual(["FILE", "PASTED_TEXT", "CALL_NOTE"]);
     expect(inlineEvidenceKinds).toEqual(["PASTED_TEXT", "CALL_NOTE"]);
+  });
+
+  it.each(["READY", "REMOVED"] as const)("allows PASTED_TEXT and CALL_NOTE in %s", (status) => {
+    expect(isEvidenceKindStatusValid("PASTED_TEXT", status)).toBe(true);
+    expect(isEvidenceKindStatusValid("CALL_NOTE", status)).toBe(true);
+  });
+
+  it.each(["AWAITING_UPLOAD", "VALIDATING", "REJECTED"] as const)("rejects inline evidence in %s", (status) => {
+    expect(isEvidenceKindStatusValid("PASTED_TEXT", status)).toBe(false);
+    expect(isEvidenceKindStatusValid("CALL_NOTE", status)).toBe(false);
+  });
+
+  it.each(evidenceStatuses)("allows FILE lifecycle status %s", (status) => {
+    expect(isEvidenceKindStatusValid("FILE", status)).toBe(true);
   });
 
   it("defines only the approved evidence categories", () => {

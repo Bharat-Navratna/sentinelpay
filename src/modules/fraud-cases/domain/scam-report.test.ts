@@ -8,6 +8,7 @@ import {
   MAX_NARRATIVE_CHARACTERS,
   MIN_NARRATIVE_CHARACTERS,
   contactChannels,
+  assertScamReportChronology,
   isScamReportSubmissionReady,
   parseScamReport,
   scamCategories,
@@ -197,5 +198,28 @@ describe("structured scam report", () => {
     expect(() =>
       parseScamReport({ ...validReport(), bankPassword: "not collected" }),
     ).toThrowError(new FraudCaseDomainError("INVALID_SCAM_REPORT"));
+  });
+});
+
+describe("scam report chronology", () => {
+  const now = new Date("2026-08-07T12:00:00.000Z");
+  it.each([
+    ["exact current time", now, now],
+    ["five-minute tolerated skew", new Date("2026-08-07T12:05:00.000Z"), null],
+    ["same-time contact and discovery", now, now],
+    ["contact before discovery", new Date("2026-08-01T09:00:00.000Z"), new Date("2026-08-01T10:00:00.000Z")],
+  ])("accepts %s", (_label, firstContactAt, discoveredAt) => {
+    expect(() => assertScamReportChronology({ firstContactAt, discoveredAt }, now)).not.toThrow();
+  });
+  it.each([
+    ["just beyond tolerance", null, new Date("2026-08-07T12:05:00.001Z")],
+    ["future discovery", null, new Date("2026-09-01T00:00:00.000Z")],
+    ["future first contact", new Date("2026-09-01T00:00:00.000Z"), null],
+    ["contact after discovery", new Date("2026-08-02T00:00:00.000Z"), new Date("2026-08-01T00:00:00.000Z")],
+  ])("rejects %s", (_label, firstContactAt, discoveredAt) => {
+    expect(() => assertScamReportChronology({ firstContactAt, discoveredAt }, now)).toThrowError(expect.objectContaining({ code: "INVALID_SCAM_REPORT_CHRONOLOGY" }));
+  });
+  it.each([{}, { firstContactAt: new Date("2026-08-01T00:00:00.000Z") }, { discoveredAt: new Date("2026-08-01T00:00:00.000Z") }])("accepts valid incomplete draft chronology", (input) => {
+    expect(() => assertScamReportChronology(input, now)).not.toThrow();
   });
 });

@@ -204,7 +204,17 @@ async function seed(): Promise<void> {
     });
 
   const dashboard = await getDemoCustomerDashboard();
-  const seededPayment = dashboard?.payments[0];
+  const [stableCustomer] = await db
+    .select({ id: customers.id })
+    .from(customers)
+    .where(eq(customers.id, ids.customer));
+  const [stableAccount] = await db
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(eq(accounts.id, ids.account));
+  const seededPayment = dashboard?.payments.find(
+    (payment) => payment.id === ids.historicalPayment,
+  );
   const [assessmentCount] = await db
     .select({ value: count() })
     .from(paymentRiskAssessments)
@@ -216,8 +226,10 @@ async function seed(): Promise<void> {
 
   if (
     !dashboard ||
-    dashboard.beneficiaries.length !== 2 ||
-    dashboard.payments.length !== 1 ||
+    stableCustomer?.id !== ids.customer ||
+    stableAccount?.id !== ids.account ||
+    !dashboard.beneficiaries.some((beneficiary) => beneficiary.id === ids.danceStudio) ||
+    !dashboard.beneficiaries.some((beneficiary) => beneficiary.id === ids.apexCapital) ||
     !seededPayment ||
     seededPayment.events.length !== 4 ||
     assessmentCount?.value !== 1 ||
@@ -231,7 +243,7 @@ async function seed(): Promise<void> {
     account: dashboard.account.accountName,
     openingBalanceMinor: dashboard.account.openingBalanceMinor,
     beneficiaryCount: dashboard.beneficiaries.length,
-    paymentCount: dashboard.payments.length,
+    stablePaymentId: seededPayment.id,
     paymentAmountMinor: seededPayment.amountMinor,
     paymentStatus: seededPayment.status,
     eventTypes: seededPayment.events.map((event) => event.eventType),
