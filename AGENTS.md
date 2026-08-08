@@ -406,6 +406,8 @@ Record:
 
 Do not place secrets or unnecessary personal data inside audit metadata.
 
+When audit events can share the same timestamp, random UUID ordering must not be treated as evidence of business-event chronology. Workflows requiring authoritative ordering must use an explicit monotonic value within the relevant aggregate or workflow, allocate it inside the same serialized transaction as the business mutation, and enforce uniqueness where practical. Retain timestamps separately; do not fabricate causal order from random identifiers.
+
 ---
 
 ## 14. Authentication and authorisation
