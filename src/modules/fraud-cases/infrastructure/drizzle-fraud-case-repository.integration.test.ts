@@ -18,6 +18,13 @@ import {
 } from "../../../db/schema";
 import { addInlineEvidence, removeEvidence } from "../application/manage-inline-evidence";
 import {
+  claimFileEvidenceValidation,
+  createFileEvidence,
+  reserveValidatedFileMetadata,
+  retryStaleFileEvidenceValidation,
+} from "../application/manage-file-evidence";
+import { buildFinalEvidenceObjectLocator } from "../../evidence/application/evidence-object-keys";
+import {
   claimExtractionRun,
   completeExtractionRun,
   createExtractionRun,
@@ -116,6 +123,18 @@ integrationDescribe("Drizzle fraud-case repository against Neon PostgreSQL", () 
       { caseId, kind: "PASTED_TEXT", category: "MESSAGE_CONVERSATION", content: text, idempotencyKey: key },
       deps(),
     );
+    if (!evidenceIds.includes(evidence.id)) evidenceIds.push(evidence.id);
+    return evidence;
+  }
+
+  async function createFile(caseId: string, key = randomUUID()) {
+    const evidence = await createFileEvidence({
+      caseId,
+      category: "OTHER_DOCUMENT",
+      originalFilename: "synthetic-evidence.png",
+      declaredMimeType: "image/png",
+      uploadIdempotencyKey: key,
+    }, deps());
     if (!evidenceIds.includes(evidence.id)) evidenceIds.push(evidence.id);
     return evidence;
   }
@@ -307,6 +326,100 @@ integrationDescribe("Drizzle fraud-case repository against Neon PostgreSQL", () 
     const paymentId = await createPayment();
     const invalidCaseId = randomUUID(); caseIds.push(invalidCaseId);
     await expect(db.insert(fraudCases).values({ id: invalidCaseId, paymentId, caseReference: "invalid", status: "DRAFT", createdAt: NOW, updatedAt: NOW })).rejects.toSatisfy((error: unknown) => databaseCode(error) === "23514");
+  });
+
+  it("serializes concurrent FILE creation at the fifth-item boundary", async () => {
+    const workflow = await createCase();
+    for (let index = 0; index < 4; index += 1) await createFile(workflow.fraudCase.id);
+    const attempts = await Promise.allSettled([
+      createFile(workflow.fraudCase.id),
+      createFile(workflow.fraudCase.id),
+    ]);
+    expect(attempts.filter((item) => item.status === "fulfilled")).toHaveLength(1);
+    expect(attempts.filter((item) => item.status === "rejected")[0]).toMatchObject({ reason: { code: "FILE_EVIDENCE_LIMIT_REACHED" } });
+    const loaded = await repository.loadCase(workflow.fraudCase.id, ACCOUNT_ID);
+    expect(loaded?.evidenceItems.filter((item) => item.kind === "FILE" && item.status !== "REMOVED")).toHaveLength(5);
+    expect(loaded?.events.filter((event) => event.eventType === "EVIDENCE_UPLOAD_REQUESTED")).toHaveLength(5);
+  });
+
+  it("allows one validation claimant and fences a worker after stale reclaim", async () => {
+    const workflow = await createCase();
+    const evidence = await createFile(workflow.fraudCase.id);
+    const claims = await Promise.all([
+      claimFileEvidenceValidation({ caseId: workflow.fraudCase.id, evidenceId: evidence.id }, deps()),
+      claimFileEvidenceValidation({ caseId: workflow.fraudCase.id, evidenceId: evidence.id }, deps()),
+    ]);
+    const claimed = claims.find((item) => item.kind === "CLAIMED");
+    expect(claimed?.kind).toBe("CLAIMED");
+    expect(claims.filter((item) => item.kind === "IN_PROGRESS")).toHaveLength(1);
+    if (!claimed || claimed.kind !== "CLAIMED") return;
+    const reclaimed = await retryStaleFileEvidenceValidation(
+      { caseId: workflow.fraudCase.id, evidenceId: evidence.id },
+      deps(new Date(claimed.validationToken.getTime() + 10 * 60_000)),
+    );
+    expect(reclaimed.kind).toBe("RECLAIMED");
+    const sha256 = "c".repeat(64);
+    await expect(reserveValidatedFileMetadata({
+      caseId: workflow.fraudCase.id,
+      evidenceId: evidence.id,
+      validationToken: claimed.validationToken,
+      sizeBytes: 100,
+      detectedMimeType: "image/png",
+      sha256,
+      finalLocator: buildFinalEvidenceObjectLocator({ caseId: workflow.fraudCase.id, evidenceId: evidence.id, sha256 }),
+    }, deps())).rejects.toMatchObject({ code: "EVIDENCE_VALIDATION_CONFLICT" });
+  });
+
+  it("serializes authoritative byte reservations so concurrent candidates cannot exceed 20 MiB", async () => {
+    const workflow = await createCase();
+    const mebibyte = 1024 * 1024;
+    for (const [index, sizeBytes] of [5, 5, 4].entries()) {
+      const evidenceId = randomUUID();
+      const sha256 = String(index + 1).repeat(64);
+      evidenceIds.push(evidenceId);
+      await db.insert(evidenceItems).values({
+        id: evidenceId,
+        caseId: workflow.fraudCase.id,
+        kind: "FILE",
+        category: "OTHER_DOCUMENT",
+        status: "READY",
+        originalFilename: `synthetic-${index}.png`,
+        storageObjectKey: buildFinalEvidenceObjectLocator({ caseId: workflow.fraudCase.id, evidenceId, sha256 }),
+        declaredMimeType: "image/png",
+        detectedMimeType: "image/png",
+        sizeBytes: sizeBytes * mebibyte,
+        sha256,
+        uploadIdempotencyKey: randomUUID(),
+        uploadedAt: NOW,
+        validatedAt: NOW,
+        createdAt: NOW,
+        updatedAt: NOW,
+      });
+    }
+    const candidates = await Promise.all([createFile(workflow.fraudCase.id), createFile(workflow.fraudCase.id)]);
+    const claims = await Promise.all(candidates.map((evidence) => claimFileEvidenceValidation({ caseId: workflow.fraudCase.id, evidenceId: evidence.id }, deps())));
+    expect(claims.every((claim) => claim.kind === "CLAIMED")).toBe(true);
+    const sizes = [3 * mebibyte, 4 * mebibyte];
+    const reservations = await Promise.all(claims.map((claim, index) => {
+      if (claim.kind !== "CLAIMED") throw new Error("Expected FILE validation claim");
+      const sha256 = (index === 0 ? "a" : "b").repeat(64);
+      return reserveValidatedFileMetadata({
+        caseId: workflow.fraudCase.id,
+        evidenceId: claim.evidence.id,
+        validationToken: claim.validationToken,
+        sizeBytes: sizes[index],
+        detectedMimeType: "image/png",
+        sha256,
+        finalLocator: buildFinalEvidenceObjectLocator({ caseId: workflow.fraudCase.id, evidenceId: claim.evidence.id, sha256 }),
+      }, deps());
+    }));
+    expect(reservations.map((item) => item.kind).sort()).toEqual(["REJECTED", "RESERVED"]);
+    const loaded = await repository.loadCase(workflow.fraudCase.id, ACCOUNT_ID);
+    const countedBytes = loaded!.evidenceItems
+      .filter((item) => item.kind === "FILE" && (item.status === "READY" || (item.status === "VALIDATING" && item.sizeBytes !== null)))
+      .reduce((total, item) => total + (item.sizeBytes ?? 0), 0);
+    expect(countedBytes).toBeLessThanOrEqual(20 * mebibyte);
+    expect(loaded?.events.filter((event) => event.eventType === "EVIDENCE_REJECTED")).toHaveLength(1);
   });
 
   it("enforces active and completed extraction uniqueness and preserves failed attempts", async () => {

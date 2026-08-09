@@ -28,3 +28,12 @@ export type AddInlineEvidenceCommand = { accountId: string; evidence: EvidenceIt
 export type RemoveEvidenceCommand = { accountId: string; caseId: string; evidenceId: string; expectedStatus: EvidenceStatus; updatedAt: Date; event: NewCaseEvent };
 export type ExtractionTransitionCommand = { accountId: string; caseId: string; runId: string; fromStatus: ExtractionStatus; run: ExtractionRunRecord; event: NewCaseEvent };
 export type SubmitCaseCommand = { accountId: string; caseId: string; expectedReportVersion: number; idempotencyKey: string; submittedAt: Date; event: NewCaseEvent };
+
+export type CreateFileEvidenceCommand = { accountId: string; evidence: EvidenceItemRecord; event: NewCaseEvent };
+export type PrepareFileUploadGrantCommand = { accountId: string; caseId: string; evidenceId: string; expiresAt: Date; updatedAt: Date };
+export type ClaimFileValidationCommand = { accountId: string; caseId: string; evidenceId: string; validationToken: Date; uploadedAt: Date; event: NewCaseEvent };
+export type ReclaimFileValidationCommand = { accountId: string; caseId: string; evidenceId: string; previousToken: Date; staleBefore: Date; replacementToken: Date; event: NewCaseEvent };
+export type AuthoritativeFileMetadata = { sizeBytes: number; detectedMimeType: string; sha256: string; storageObjectKey: string };
+export type ReserveFileMetadataCommand = { accountId: string; caseId: string; evidenceId: string; validationToken: Date; metadata: AuthoritativeFileMetadata; updatedAt: Date; rejectionEvent: NewCaseEvent };
+export type FinalizeFileReadyCommand = { accountId: string; caseId: string; evidenceId: string; validationToken: Date; metadata: AuthoritativeFileMetadata; completedAt: Date; event: NewCaseEvent };
+export type FinalizeFileRejectedCommand = { accountId: string; caseId: string; evidenceId: string; validationToken: Date; safeFailureCode: string; completedAt: Date; event: NewCaseEvent };
