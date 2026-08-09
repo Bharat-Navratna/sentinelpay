@@ -31,5 +31,6 @@ export interface EvidenceStorage {
     bytes: Uint8Array,
     contentType: string,
   ): Promise<PutValidatedObjectResult>;
+  /** Returns true when the exact object was deleted or is already known absent; false when cleanup could not be confirmed. */
   deleteObjectBestEffort(locator: StorageObjectLocator): Promise<boolean>;
 }

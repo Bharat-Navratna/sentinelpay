@@ -5,12 +5,14 @@ import { acceptedFileMimeTypes, FileValidationError, type FileEvidenceValidator,
 import { MAX_EVIDENCE_FILE_BYTES, MAX_PDF_PAGES } from "../../evidence/domain/evidence";
 import { ownedCase, requireDraft, type ServiceDependencies } from "./case-service-helpers";
 import { FraudCaseApplicationError } from "./fraud-case-application-errors";
+import { cleanupFileEvidenceStorage, type FileEvidenceCleanupStatus } from "./cleanup-file-evidence";
 import {
   claimFileEvidenceValidation,
   finalizeFileEvidenceReady,
   finalizeFileEvidenceRejected,
   prepareFileEvidenceUploadGrant,
   reserveValidatedFileMetadata,
+  retryStaleFileEvidenceValidation,
   type SafeFileRejectionCode,
 } from "./manage-file-evidence";
 
@@ -20,7 +22,11 @@ export type FileEvidenceOrchestrationDependencies = ServiceDependencies & {
 };
 
 export type FileEvidenceProcessingResult = {
-  kind: "READY" | "REJECTED" | "IN_PROGRESS";
+  kind: "READY" | "REJECTED";
+  evidenceId: string;
+  cleanupStatus: FileEvidenceCleanupStatus;
+} | {
+  kind: "IN_PROGRESS";
   evidenceId: string;
 };
 
@@ -45,11 +51,21 @@ export async function confirmAndProcessFileEvidenceUpload(
   deps: FileEvidenceOrchestrationDependencies,
 ): Promise<FileEvidenceProcessingResult> {
   const claim = await claimFileEvidenceValidation(input, deps);
-  if (claim.kind === "IN_PROGRESS" || claim.kind === "READY" || claim.kind === "REJECTED") {
-    return { kind: claim.kind, evidenceId: claim.evidence.id };
-  }
+  if (claim.kind === "IN_PROGRESS") return { kind: "IN_PROGRESS", evidenceId: claim.evidence.id };
+  if (claim.kind === "READY" || claim.kind === "REJECTED") return terminalResult(claim.kind, input, deps);
   if (!("validationToken" in claim)) throw new FraudCaseApplicationError("EVIDENCE_VALIDATION_CONFLICT");
   return processClaimedFileEvidenceUpload({ ...input, validationToken: claim.validationToken }, deps);
+}
+
+export async function recoverStaleFileEvidenceValidation(
+  input: { caseId: string; evidenceId: string },
+  deps: FileEvidenceOrchestrationDependencies,
+): Promise<FileEvidenceProcessingResult> {
+  const recovery = await retryStaleFileEvidenceValidation(input, deps);
+  if (recovery.kind === "IN_PROGRESS") return { kind: "IN_PROGRESS", evidenceId: recovery.evidence.id };
+  if (recovery.kind === "READY" || recovery.kind === "REJECTED") return terminalResult(recovery.kind, input, deps);
+  if (recovery.kind !== "RECLAIMED") throw new FraudCaseApplicationError("EVIDENCE_VALIDATION_CONFLICT");
+  return processClaimedFileEvidenceUpload({ ...input, validationToken: recovery.validationToken }, deps);
 }
 
 /** Internal worker boundary. The token must come from a successful persisted claim. */
@@ -106,7 +122,7 @@ export async function processClaimedFileEvidenceUpload(
     sha256: validated.sha256,
     finalLocator,
   }, deps);
-  if (reservation.kind === "REJECTED") return { kind: "REJECTED", evidenceId: reservation.evidence.id };
+  if (reservation.kind === "REJECTED") return terminalResult("REJECTED", input, deps);
 
   try {
     const result = await deps.storage.putValidatedObject(finalLocator, bytes, validated.detectedMimeType);
@@ -125,7 +141,7 @@ export async function processClaimedFileEvidenceUpload(
     finalLocator,
     pdfPageCount: validated.pdfPageCount,
   }, deps);
-  return { kind: "READY", evidenceId: ready.id };
+  return terminalResult("READY", { caseId: input.caseId, evidenceId: ready.id }, deps);
 }
 
 async function rejectClaim(
@@ -134,7 +150,16 @@ async function rejectClaim(
   deps: FileEvidenceOrchestrationDependencies,
 ): Promise<FileEvidenceProcessingResult> {
   const rejected = await finalizeFileEvidenceRejected({ ...input, safeFailureCode: code }, deps);
-  return { kind: "REJECTED", evidenceId: rejected.id };
+  return terminalResult("REJECTED", { caseId: input.caseId, evidenceId: rejected.id }, deps);
+}
+
+async function terminalResult(
+  kind: "READY" | "REJECTED",
+  input: { caseId: string; evidenceId: string },
+  deps: FileEvidenceOrchestrationDependencies,
+): Promise<FileEvidenceProcessingResult> {
+  const cleanup = await cleanupFileEvidenceStorage(input, deps);
+  return { kind, evidenceId: cleanup.evidenceId, cleanupStatus: cleanup.cleanupStatus };
 }
 
 function safeInfrastructureError(error: unknown): EvidenceStorageError | FraudCaseApplicationError {

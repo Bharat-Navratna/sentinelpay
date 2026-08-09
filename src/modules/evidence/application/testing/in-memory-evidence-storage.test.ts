@@ -75,6 +75,11 @@ describe("InMemoryEvidenceStorage", () => {
     await expect(storage.headObject(second)).resolves.toEqual({ sizeBytes: 1 });
   });
 
+  it("treats an already-absent exact object as completed cleanup", async () => {
+    const storage = new InMemoryEvidenceStorage();
+    await expect(storage.deleteObjectBestEffort(first)).resolves.toBe(true);
+  });
+
   it("returns false rather than exposing cleanup failures", async () => {
     const storage = new InMemoryEvidenceStorage();
     storage.seedObject(first, new Uint8Array([1]));

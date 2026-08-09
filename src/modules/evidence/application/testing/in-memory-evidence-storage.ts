@@ -75,7 +75,8 @@ export class InMemoryEvidenceStorage implements EvidenceStorage {
       this.failNextOperation = false;
       return false;
     }
-    return this.objects.delete(locator);
+    this.objects.delete(locator);
+    return true;
   }
 
   private getObject(locator: StorageObjectLocator): Uint8Array {
