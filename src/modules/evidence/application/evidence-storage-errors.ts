@@ -1,4 +1,5 @@
 export const evidenceStorageErrorCodes = [
+  "STORAGE_CONFIGURATION_UNAVAILABLE",
   "STORAGE_OBJECT_NOT_FOUND",
   "STORAGE_TEMPORARILY_UNAVAILABLE",
   "STORAGE_READ_LIMIT_EXCEEDED",
@@ -10,6 +11,7 @@ export type EvidenceStorageErrorCode =
   (typeof evidenceStorageErrorCodes)[number];
 
 const messages: Record<EvidenceStorageErrorCode, string> = {
+  STORAGE_CONFIGURATION_UNAVAILABLE: "Evidence storage configuration is unavailable.",
   STORAGE_OBJECT_NOT_FOUND: "The evidence object could not be found.",
   STORAGE_TEMPORARILY_UNAVAILABLE: "Evidence storage is temporarily unavailable.",
   STORAGE_READ_LIMIT_EXCEEDED: "The evidence object exceeds the permitted read size.",
