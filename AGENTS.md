@@ -453,6 +453,15 @@ Do not implement authentication or role systems until the approved task requires
 - Use least-privilege access.
 - Use synthetic screenshots and messages only.
 - Treat uploaded evidence as untrusted input.
+- Treat presigned object-storage URLs as bearer credentials and never log them.
+- Restrict browser upload authority to one exact quarantine object; never grant browser writes to validated evidence.
+- Treat browser-provided filenames, MIME types, sizes, hashes and upload metadata as untrusted.
+- Keep evidence objects private and mark evidence READY only after server-authoritative validation and hashing.
+- Never replace validated evidence in place; replacement requires a new evidence item.
+- Treat PostgreSQL and object storage as separate systems without a distributed transaction.
+- Make cross-system retries idempotent and provide narrowly scoped cleanup or reconciliation.
+- Keep object keys, signed URLs, storage credentials and raw provider errors internal.
+- Ensure storage cleanup can never unintentionally delete validated evidence.
 
 If a secret may have been exposed:
 
